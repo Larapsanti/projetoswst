@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema PMO</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f2f5;
+  display: flex;
+  min-height: 100vh;
+  color: #111827;
+}
+
+.sidebar {
+  width: 220px;
+  min-height: 100vh;
+  background: #1e3a5f;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0;
+}
+.sidebar-brand { padding: 24px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.sidebar-brand h2 { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+.sidebar-brand p  { font-size: 11px; opacity: 0.55; margin-top: 3px; }
+
+nav { padding: 12px 0; flex: 1; }
+.nav-item {
+  padding: 12px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s;
+  border-left: 3px solid transparent;
+}
+.nav-item:hover  { background: rgba(255,255,255,0.07); }
+.nav-item.active { background: rgba(255,255,255,0.12); border-left-color: #60a5fa; }
+.nav-item svg { width: 18px; height: 18px; opacity: 0.8; flex-shrink: 0; }
+.sidebar-footer { padding: 16px 20px; font-size: 11px; opacity: 0.4; border-top: 1px solid rgba(255,255,255,0.1); }
+
+.main { margin-left: 220px; flex: 1; padding: 32px; }
+.page { display: none; }
+.page.active { display: block; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+.page-title { font-size: 22px; font-weight: 700; color: #1e3a5f; }
+
+/* Config banner */
+.config-banner {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  font-size: 13px;
+  color: #92400e;
+  display: none;
+}
+.config-banner.show { display: block; }
+.config-banner strong { font-weight: 700; }
+
+.cards-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.card { background: white; border-radius: 12px; padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+.card-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+.card-icon svg { width: 20px; height: 20px; }
+.card-label { font-size: 12px; color: #6b7280; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; }
+.card-value { font-size: 30px; font-weight: 800; color: #1e3a5f; margin-top: 4px; line-height: 1; }
+.card-sub   { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+
+.charts-grid { display: grid; grid-template-columns: 1fr 1.6fr; gap: 16px; margin-bottom: 28px; }
+.chart-card { background: white; border-radius: 12px; padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+.chart-title { font-size: 13px; font-weight: 700; color: #374151; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.4px; }
+.chart-wrap-sm { max-height: 220px; }
+
+.table-card { background: white; border-radius: 12px; padding: 20px 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+.table-controls { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.search-input { padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; width: 220px; outline: none; transition: border-color 0.15s; }
+.search-input:focus { border-color: #1e3a5f; }
+.filter-select { padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; outline: none; background: white; cursor: pointer; }
+.filter-select:focus { border-color: #1e3a5f; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; padding: 8px 10px; border-bottom: 2px solid #f3f4f6; white-space: nowrap; }
+td { padding: 11px 10px; border-bottom: 1px solid #f3f4f6; color: #374151; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafbff; }
+.td-actions { display: flex; gap: 6px; white-space: nowrap; }
+
+.badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.badge-andamento    { background: #dbeafe; color: #1d4ed8; }
+.badge-concluido    { background: #d1fae5; color: #065f46; }
+.badge-pausado      { background: #fef3c7; color: #92400e; }
+.badge-cancelado    { background: #fee2e2; color: #991b1b; }
+.badge-nao-iniciado { background: #f3f4f6; color: #374151; }
+
+.btn { padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: opacity 0.15s, transform 0.1s; white-space: nowrap; }
+.btn:hover  { opacity: 0.88; }
+.btn:active { transform: scale(0.98); }
+.btn-primary   { background: #1e3a5f; color: white; }
+.btn-secondary { background: #f3f4f6; color: #374151; }
+.btn-sm     { padding: 5px 11px; font-size: 12px; border-radius: 6px; }
+.btn-edit   { background: #eff6ff; color: #1d4ed8; }
+.btn-delete { background: #fef2f2; color: #dc2626; }
+
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.45); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.open { display: flex; }
+.modal { background: white; border-radius: 16px; padding: 32px; width: 100%; max-width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.modal-title { font-size: 18px; font-weight: 700; color: #1e3a5f; }
+.modal-close { width: 32px; height: 32px; border-radius: 8px; border: none; background: #f3f4f6; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #6b7280; line-height: 1; }
+.modal-close:hover { background: #e5e7eb; }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.span2 { grid-column: span 2; }
+.form-group label { font-size: 12px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.3px; }
+.form-group input, .form-group select { padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; color: #111827; outline: none; transition: border-color 0.15s; background: white; }
+.form-group input:focus, .form-group select:focus { border-color: #1e3a5f; box-shadow: 0 0 0 3px rgba(30,58,95,0.08); }
+.form-group input[readonly] { background: #f9fafb; color: #6b7280; }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; padding-top: 20px; border-top: 1px solid #f3f4f6; }
+
+.empty-state { text-align: center; padding: 48px 20px; color: #9ca3af; }
+.empty-state p { font-size: 14px; }
+
+.loading-overlay { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.7); z-index: 300; align-items: center; justify-content: center; flex-direction: column; gap: 12px; font-size: 14px; color: #6b7280; }
+.loading-overlay.open { display: flex; }
+.spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #1e3a5f; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500; color: white; z-index: 400; transform: translateY(80px); opacity: 0; transition: all 0.3s ease; pointer-events: none; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-success { background: #059669; }
+.toast-error   { background: #dc2626; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <span>Carregando...</span>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <h2>PMO</h2>
+    <p>Gestão de Projetos</p>
+  </div>
+  <nav>
+    <div class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      Dashboard
+    </div>
+    <div class="nav-item" id="nav-projetos" onclick="navigate('projetos')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+        <rect x="9" y="3" width="6" height="4" rx="1"/>
+        <line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
+      </svg>
+      Projetos
+    </div>
+    <div class="nav-item" id="nav-novo" onclick="openModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      Novo Projeto
+    </div>
+  </nav>
+  <div class="sidebar-footer">WST · 2025</div>
+</aside>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- ── Dashboard ── -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <h1 class="page-title">Dashboard</h1>
+      <button class="btn btn-secondary" onclick="loadProjects()">Atualizar</button>
+    </div>
+
+    <div class="config-banner" id="config-banner">
+      <strong>Configuracao pendente:</strong> Cole as URLs dos fluxos do Power Automate na secao CONFIG no topo do arquivo HTML antes de usar o sistema.
+    </div>
+
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-icon" style="background:#eff6ff">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2">
+            <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+          </svg>
+        </div>
+        <div class="card-label">Total de Projetos</div>
+        <div class="card-value" id="c-total">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:#dbeafe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
+          </svg>
+        </div>
+        <div class="card-label">Em Andamento</div>
+        <div class="card-value" id="c-andamento">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:#d1fae5">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <div class="card-label">Concluidos</div>
+        <div class="card-value" id="c-concluido">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:#fef3c7">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
+            <line x1="12" y1="1" x2="12" y2="23"/>
+            <path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+          </svg>
+        </div>
+        <div class="card-label">Valor Total</div>
+        <div class="card-value" id="c-valor" style="font-size:20px;padding-top:6px">—</div>
+        <div class="card-sub">R$</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Projetos por Status</div>
+        <div class="chart-wrap chart-wrap-sm">
+          <canvas id="chartStatus"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Projetos por Coordenador PMO</div>
+        <div class="chart-wrap">
+          <canvas id="chartCoord"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="chart-title">Projetos Recentes</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Codigo</th><th>Cliente</th><th>Status</th>
+            <th>Conclusao Prevista</th><th>Valor</th>
+          </tr>
+        </thead>
+        <tbody id="tb-recentes"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Projetos ── -->
+  <div class="page" id="page-projetos">
+    <div class="page-header">
+      <h1 class="page-title">Projetos</h1>
+      <button class="btn btn-primary" onclick="openModal()">+ Novo Projeto</button>
+    </div>
+    <div class="table-card">
+      <div class="table-controls">
+        <input class="search-input" type="text" placeholder="Buscar por codigo ou cliente..."
+          oninput="state.filter.search = this.value; renderTable()">
+        <select class="filter-select" onchange="state.filter.status = this.value; renderTable()">
+          <option value="">Todos os status</option>
+          <option>Em Andamento</option>
+          <option>Nao Iniciado</option>
+          <option>Concluido</option>
+          <option>Pausado</option>
+          <option>Cancelado</option>
+        </select>
+        <select class="filter-select" id="filter-coord" onchange="state.filter.coord = this.value; renderTable()">
+          <option value="">Todos coordenadores</option>
+        </select>
+        <span id="count-label" style="font-size:13px;color:#9ca3af;margin-left:auto"></span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Codigo</th><th>Cliente</th><th>Status</th>
+            <th>Coord. Projeto</th><th>Coord. PMO</th>
+            <th>Valor</th><th>Abertura</th><th>Conclusao</th><th>Duracao</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tb-projetos"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Modal ── -->
+<div class="modal-overlay" id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Novo Projeto</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Codigo do Projeto *</label>
+        <input type="text" id="f-codigo" placeholder="Ex: PRJ-2025-001">
+      </div>
+      <div class="form-group">
+        <label>Cliente *</label>
+        <input type="text" id="f-cliente" placeholder="Nome do cliente">
+      </div>
+      <div class="form-group">
+        <label>Status *</label>
+        <select id="f-status">
+          <option value="">Selecione...</option>
+          <option>Em Andamento</option>
+          <option>Nao Iniciado</option>
+          <option>Concluido</option>
+          <option>Pausado</option>
+          <option>Cancelado</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Valor (R$)</label>
+        <input type="number" id="f-valor" placeholder="0,00" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>Coordenador de Projeto</label>
+        <input type="text" id="f-coord-proj" placeholder="Nome do coordenador">
+      </div>
+      <div class="form-group">
+        <label>Coordenador Tecnico PMO</label>
+        <input type="text" id="f-coord-pmo" placeholder="Nome do coordenador PMO">
+      </div>
+      <div class="form-group">
+        <label>Data de Abertura</label>
+        <input type="date" id="f-abertura" onchange="calcDuracao()">
+      </div>
+      <div class="form-group">
+        <label>Conclusao Prevista</label>
+        <input type="date" id="f-conclusao" onchange="calcDuracao()">
+      </div>
+      <div class="form-group span2">
+        <label>Duracao (calculada automaticamente)</label>
+        <input type="text" id="f-duracao" readonly placeholder="Calculada a partir das datas">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitForm()">Salvar Projeto</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  CONFIGURACAO — cole aqui as URLs dos seus fluxos
+// ═══════════════════════════════════════════════
+const CONFIG = {
+  URL_GET:    'https://defaultfea666644a8445398269ee79f745a3.f4.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/dbffd5945c3e45698f36883d6739834d/triggers/manual/paths/invoke?api-version=1',   // URL do fluxo "Buscar Projetos"
+  URL_SAVE:   'https://defaultfea666644a8445398269ee79f745a3.f4.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/c013440e558742159c1c9dbc86b3d6fb/triggers/manual/paths/invoke?api-version=1',   // URL do fluxo "Salvar Projeto"
+  URL_DELETE: 'https://defaultfea666644a8445398269ee79f745a3.f4.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/24639e63c6dd4cd790b697e6485e6aa1/triggers/manual/paths/invoke?api-version=1'    // URL do fluxo "Excluir Projeto"
+};
+// ═══════════════════════════════════════════════
+
+const state = {
+  projects:   [],
+  editingId:  null,
+  filter:     { search: '', status: '', coord: '' }
+};
+
+let chartStatus = null;
+let chartCoord  = null;
+
+// ── Init ──────────────────────────────────────
+window.onload = function () {
+  if (!CONFIG.URL_GET || !CONFIG.URL_SAVE || !CONFIG.URL_DELETE) {
+    document.getElementById('config-banner').classList.add('show');
+    return;
+  }
+  loadProjects();
+};
+
+// ── API calls ─────────────────────────────────
+async function loadProjects() {
+  showLoading(true);
+  try {
+    const res  = await fetch(CONFIG.URL_GET, { method: 'GET' });
+    const data = await res.json();
+
+    state.projects = (Array.isArray(data) ? data : []).map(r => ({
+      _id:                 r.ItemInternalId || r._id || '',
+      codigo:              r.Codigo              || '',
+      cliente:             r.Cliente             || '',
+      status:              r.Status              || '',
+      coordenador_projeto: r.CoordenadorProjeto  || '',
+      coordenador_pmo:     r.CoordenadorPMO      || '',
+      valor:               parseFloat(r.Valor)   || 0,
+      data_abertura:       r.DataAbertura        || '',
+      conclusao_prevista:  r.ConclusaoPrevista   || '',
+      duracao:             r.Duracao             || ''
+    })).filter(p => p.codigo);
+
+    renderDashboard();
+    renderTable();
+    populateCoordFilter();
+  } catch (e) {
+    toast('Erro ao carregar projetos. Verifique as URLs dos fluxos.', 'error');
+  }
+  showLoading(false);
+}
+
+async function apiSave(payload) {
+  const res = await fetch(CONFIG.URL_SAVE, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+async function apiDelete(id) {
+  await fetch(CONFIG.URL_DELETE, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ _id: id })
+  });
+}
+
+// ── Navigation ────────────────────────────────
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('nav-' + page).classList.add('active');
+}
+
+// ── Dashboard ─────────────────────────────────
+function renderDashboard() {
+  const ps = state.projects;
+  document.getElementById('c-total').textContent     = ps.length;
+  document.getElementById('c-andamento').textContent = ps.filter(p => p.status === 'Em Andamento').length;
+  document.getElementById('c-concluido').textContent = ps.filter(p => p.status === 'Concluido').length;
+  document.getElementById('c-valor').textContent     = formatCurrency(ps.reduce((s, p) => s + p.valor, 0));
+
+  renderChartStatus(ps);
+  renderChartCoord(ps);
+  renderRecentes(ps);
+}
+
+function renderChartStatus(ps) {
+  const statusList = ['Em Andamento','Nao Iniciado','Concluido','Pausado','Cancelado'];
+  const colors     = ['#3b82f6','#9ca3af','#10b981','#f59e0b','#ef4444'];
+  const counts     = statusList.map(s => ps.filter(p => p.status === s).length);
+  const ctx = document.getElementById('chartStatus').getContext('2d');
+  if (chartStatus) chartStatus.destroy();
+  chartStatus = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: statusList, datasets: [{ data: counts, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } } }, cutout: '62%' }
+  });
+}
+
+function renderChartCoord(ps) {
+  const map = {};
+  ps.forEach(p => { const k = p.coordenador_pmo || 'Sem coordenador'; map[k] = (map[k] || 0) + 1; });
+  const ctx = document.getElementById('chartCoord').getContext('2d');
+  if (chartCoord) chartCoord.destroy();
+  chartCoord = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: Object.keys(map), datasets: [{ label: 'Projetos', data: Object.values(map), backgroundColor: '#1e3a5f', borderRadius: 6 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f3f4f6' } }, x: { ticks: { font: { size: 11 } }, grid: { display: false } } } }
+  });
+}
+
+function renderRecentes(ps) {
+  const sorted = [...ps].sort((a, b) => b.data_abertura > a.data_abertura ? 1 : -1).slice(0, 5);
+  const tb = document.getElementById('tb-recentes');
+  if (!sorted.length) { tb.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>Nenhum projeto cadastrado.</p></div></td></tr>'; return; }
+  tb.innerHTML = sorted.map(p => `
+    <tr>
+      <td><strong>${p.codigo}</strong></td>
+      <td>${p.cliente}</td>
+      <td>${badgeHtml(p.status)}</td>
+      <td>${formatDate(p.conclusao_prevista)}</td>
+      <td>${p.valor ? formatCurrency(p.valor) : '—'}</td>
+    </tr>`).join('');
+}
+
+// ── Table ─────────────────────────────────────
+function renderTable() {
+  const { search, status, coord } = state.filter;
+  let ps = state.projects;
+  if (search) { const q = search.toLowerCase(); ps = ps.filter(p => p.codigo.toLowerCase().includes(q) || p.cliente.toLowerCase().includes(q)); }
+  if (status) ps = ps.filter(p => p.status === status);
+  if (coord)  ps = ps.filter(p => p.coordenador_pmo === coord);
+
+  document.getElementById('count-label').textContent = ps.length + ' projeto' + (ps.length !== 1 ? 's' : '');
+  const tb = document.getElementById('tb-projetos');
+  if (!ps.length) { tb.innerHTML = '<tr><td colspan="10"><div class="empty-state"><p>Nenhum projeto encontrado.</p></div></td></tr>'; return; }
+
+  tb.innerHTML = ps.map(p => `
+    <tr>
+      <td><strong>${p.codigo}</strong></td>
+      <td>${p.cliente}</td>
+      <td>${badgeHtml(p.status)}</td>
+      <td>${p.coordenador_projeto || '—'}</td>
+      <td>${p.coordenador_pmo || '—'}</td>
+      <td>${p.valor ? formatCurrency(p.valor) : '—'}</td>
+      <td>${formatDate(p.data_abertura)}</td>
+      <td>${formatDate(p.conclusao_prevista)}</td>
+      <td>${p.duracao || '—'}</td>
+      <td>
+        <div class="td-actions">
+          <button class="btn btn-sm btn-edit" onclick='editProject(${JSON.stringify(p)})'>Editar</button>
+          <button class="btn btn-sm btn-delete" onclick="confirmDelete('${p._id}','${p.codigo}')">Excluir</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function populateCoordFilter() {
+  const coords  = [...new Set(state.projects.map(p => p.coordenador_pmo).filter(Boolean))].sort();
+  const sel     = document.getElementById('filter-coord');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todos coordenadores</option>' + coords.map(c => `<option${c === current ? ' selected' : ''}>${c}</option>`).join('');
+}
+
+// ── Modal / Form ──────────────────────────────
+function openModal(project) {
+  state.editingId = project ? project._id : null;
+  document.getElementById('modal-title').textContent = project ? 'Editar Projeto' : 'Novo Projeto';
+  document.getElementById('f-codigo').value     = project?.codigo              || '';
+  document.getElementById('f-cliente').value    = project?.cliente             || '';
+  document.getElementById('f-status').value     = project?.status              || '';
+  document.getElementById('f-valor').value      = project?.valor               || '';
+  document.getElementById('f-coord-proj').value = project?.coordenador_projeto || '';
+  document.getElementById('f-coord-pmo').value  = project?.coordenador_pmo    || '';
+  document.getElementById('f-abertura').value   = project?.data_abertura       || '';
+  document.getElementById('f-conclusao').value  = project?.conclusao_prevista  || '';
+  document.getElementById('f-duracao').value    = project?.duracao             || '';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function editProject(p) { openModal(p); }
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  state.editingId = null;
+}
+
+function calcDuracao() {
+  const ab = document.getElementById('f-abertura').value;
+  const co = document.getElementById('f-conclusao').value;
+  if (ab && co) {
+    const diff = Math.round((new Date(co) - new Date(ab)) / 86400000);
+    document.getElementById('f-duracao').value = diff > 0 ? diff + ' dias' : '0 dias';
+  } else {
+    document.getElementById('f-duracao').value = '';
+  }
+}
+
+async function submitForm() {
+  const codigo  = document.getElementById('f-codigo').value.trim();
+  const cliente = document.getElementById('f-cliente').value.trim();
+  const status  = document.getElementById('f-status').value;
+
+  if (!codigo || !cliente || !status) { toast('Preencha os campos obrigatorios: Codigo, Cliente e Status.', 'error'); return; }
+
+  const payload = {
+    _id:                state.editingId || null,
+    Codigo:             codigo,
+    Cliente:            cliente,
+    Status:             status,
+    Valor:              parseFloat(document.getElementById('f-valor').value) || 0,
+    CoordenadorProjeto: document.getElementById('f-coord-proj').value.trim(),
+    CoordenadorPMO:     document.getElementById('f-coord-pmo').value.trim(),
+    DataAbertura:       document.getElementById('f-abertura').value,
+    ConclusaoPrevista:  document.getElementById('f-conclusao').value,
+    Duracao:            document.getElementById('f-duracao').value
+  };
+
+  showLoading(true);
+  try {
+    await apiSave(payload);
+    closeModal();
+    toast(state.editingId ? 'Projeto atualizado.' : 'Projeto cadastrado.', 'success');
+    await loadProjects();
+  } catch (e) {
+    toast('Erro ao salvar. Verifique a URL do fluxo de salvar.', 'error');
+  }
+  showLoading(false);
+}
+
+async function confirmDelete(id, codigo) {
+  if (!confirm('Excluir o projeto "' + codigo + '"? Esta acao nao pode ser desfeita.')) return;
+  showLoading(true);
+  try {
+    await apiDelete(id);
+    toast('Projeto excluido.', 'success');
+    await loadProjects();
+  } catch (e) {
+    toast('Erro ao excluir.', 'error');
+  }
+  showLoading(false);
+}
+
+// ── Helpers ───────────────────────────────────
+function badgeHtml(status) {
+  const map = { 'Em Andamento': 'andamento', 'Concluido': 'concluido', 'Pausado': 'pausado', 'Cancelado': 'cancelado', 'Nao Iniciado': 'nao-iniciado' };
+  return `<span class="badge badge-${map[status] || 'nao-iniciado'}">${status || '—'}</span>`;
+}
+function formatCurrency(v) { return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function formatDate(d) { if (!d) return '—'; const [y, m, dia] = d.split('-'); return dia + '/' + m + '/' + y; }
+function showLoading(on) { document.getElementById('loading').classList.toggle('open', on); }
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast toast-' + type + ' show';
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
